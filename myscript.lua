@@ -61,7 +61,7 @@ Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 12)
 -- Title
 local title = Instance.new("TextLabel", mainFrame)
 title.Size = UDim2.new(1, 0, 0, 30)
-title.Text = "Teleport GUI 2K"
+title.Text = "Teleport GUI 3K"
 title.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 title.TextColor3 = theme.Text
 title.Font = theme.Font
@@ -146,7 +146,7 @@ end
 -- Buttons
 local tpButton = styleButton("Teleport to Strongest Pet", UDim2.new(0,20,0,40), Color3.new(1,1,1))
 local autoAnyButton = styleButton("Auto Teleport (All)", UDim2.new(0,20,0,95), theme.Danger)
-local autoButton = styleButton("Auto Teleport 2K", UDim2.new(0,20,0,150), theme.Danger)
+local autoButton = styleButton("Auto Teleport 3K", UDim2.new(0,20,0,150), theme.Danger)
 
 -- Side Buttons: positioned with extra horizontal spacing (no touching)
 local sideUnderwater = styleSideButton("UW", UDim2.new(1, -60, 0, 40), theme.Accent)
@@ -209,11 +209,11 @@ local function findStrongestPetAny()
 end
 
 local function findStrongestPet2K()
-    local strongest, max = nil, 2000
+    local strongest, max = nil, 3000
     for _, obj in pairs(CollectionService:GetTagged("Roaming")) do
         local s = obj:GetAttribute("Strength")
         local o = obj:GetAttribute("OwnerId")
-        if s and s >= 2000 and (not o or o == 0) and s > max then
+        if s and s >= 3000 and (not o or o == 0) and s > max then
             max = s
             strongest = obj
         end
@@ -253,8 +253,8 @@ end)
 
 local autoMode2K = false
 autoButton.MouseButton1Click:Connect(function()
-    autoMode2K = not autoMode2K
-    autoButton.Text = "Auto Teleport 2K: " .. (autoMode2K and "ON" or "OFF")
+    autoMode2K = not autoMode3K
+    autoButton.Text = "Auto Teleport 3K: " .. (autoMode2K and "ON" or "OFF")
     if autoMode2K then
         startGlow(glow2K)
         autoButton.UIStroke.Color = Color3.new(1,1,1)
@@ -344,8 +344,8 @@ task.spawn(function()
             end
         end
 
-        if autoMode2K then
-            local pet = findStrongestPet2K()
+        if autoMode3K then
+            local pet = findStrongestPet3K()
             if pet then root.CFrame = pet:GetPivot() + Vector3.new(0,5,0) end
         end
 
@@ -356,3 +356,4 @@ task.spawn(function()
     end
 
 end)
+
