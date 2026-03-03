@@ -1,5 +1,4 @@
 --[[ 
-    Sirius Edition: Teleport GUI 2K
     + spaced side buttons & main island side button border = green
     + walk speed slider at bottom
 --]]
@@ -208,7 +207,7 @@ local function findStrongestPetAny()
     return strongest
 end
 
-local function findStrongestPet2K()
+local function findStrongestPet3K()
     local strongest, max = nil, 3000
     for _, obj in pairs(CollectionService:GetTagged("Roaming")) do
         local s = obj:GetAttribute("Strength")
@@ -251,11 +250,11 @@ autoAnyButton.MouseButton1Click:Connect(function()
     end
 end)
 
-local autoMode2K = false
+local autoMode3K = false
 autoButton.MouseButton1Click:Connect(function()
-    autoMode2K = not autoMode3K
-    autoButton.Text = "Auto Teleport 3K: " .. (autoMode2K and "ON" or "OFF")
-    if autoMode2K then
+    autoMode3K = not autoMode3K
+    autoButton.Text = "Auto Teleport 3K: " .. (autoMode3K and "ON" or "OFF")
+    if autoMode3K then
         startGlow(glow2K)
         autoButton.UIStroke.Color = Color3.new(1,1,1)
         autoButton.TextColor3 = Color3.new(1,1,1)
@@ -356,4 +355,5 @@ task.spawn(function()
     end
 
 end)
+
 
