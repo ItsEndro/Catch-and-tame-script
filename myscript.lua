@@ -208,11 +208,11 @@ local function findStrongestPetAny()
 end
 
 local function findStrongestPet3K()
-    local strongest, max = nil, 2800
+    local strongest, max = nil, 2900
     for _, obj in pairs(CollectionService:GetTagged("Roaming")) do
         local s = obj:GetAttribute("Strength")
         local o = obj:GetAttribute("OwnerId")
-        if s and s >= 2800 and (not o or o == 0) and s > max then
+        if s and s >= 2900 and (not o or o == 0) and s > max then
             max = s
             strongest = obj
         end
@@ -326,7 +326,7 @@ task.spawn(function()
         if not root then continue end
 
         if autoMode2K or autoModeAll then
-            if os.clock() - lastAreaSwitch >= 15 then
+            if os.clock() - lastAreaSwitch >= 60 then
                 lastAreaSwitch = os.clock()
                 currentArea = (currentArea == 1) and 2 or 1
                 root.CFrame = (currentArea == 1) and underwater or mainIsland
@@ -355,6 +355,5 @@ task.spawn(function()
     end
 
 end)
-
 
 
