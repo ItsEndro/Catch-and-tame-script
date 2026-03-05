@@ -3,17 +3,19 @@
     + walk speed slider at bottom
     + paused teleporting during lasso/minigame events
     + separate Auto Load UW button (independent 60s cycle)
+    + Auto Teleport Custom (Input custom minimum strength)
 --]]
 
 local player = game.Players.LocalPlayer
 local CollectionService = game:GetService("CollectionService")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local theme = {
     Background = Color3.fromRGB(30, 30, 30),
     Accent = Color3.fromRGB(26, 148, 255),
-    Success = Color3.fromRGB(61, 179, 98),   -- green for main island border
+    Success = Color3.fromRGB(61, 179, 98),
     Danger = Color3.fromRGB(170, 37, 46),
     Text = Color3.new(1, 1, 1),
     Font = Enum.Font.SourceSansBold
@@ -49,10 +51,10 @@ local function makeDraggable(gui)
     end)
 end
 
--- Main Frame (wider to fit side buttons, taller to fit new button)
+-- Main Frame (Adjusted height to 340 to perfectly fit the new text box and layout)
 local mainFrame = Instance.new("Frame", screenGui)
-mainFrame.Size = UDim2.new(0, 300, 0, 315) -- Increased height from 260 to 315
-mainFrame.Position = UDim2.new(0.5, -150, 0.5, -157)
+mainFrame.Size = UDim2.new(0, 300, 0, 340)
+mainFrame.Position = UDim2.new(0.5, -150, 0.5, -170)
 mainFrame.BackgroundColor3 = theme.Background
 mainFrame.BorderSizePixel = 0
 mainFrame.Active = true
@@ -62,7 +64,7 @@ Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 12)
 -- Title
 local title = Instance.new("TextLabel", mainFrame)
 title.Size = UDim2.new(1, 0, 0, 30)
-title.Text = "Teleport GUI 3K"
+title.Text = "Teleport GUI Custom"
 title.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 title.TextColor3 = theme.Text
 title.Font = theme.Font
@@ -78,7 +80,7 @@ closeButton.BackgroundTransparency = 1
 closeButton.TextColor3 = theme.Danger
 closeButton.TextSize = 18
 
--- Reopen Button (fixed border, no glow)
+-- Reopen Button
 local reopenButton = Instance.new("TextButton", screenGui)
 reopenButton.Size = UDim2.new(0, 150, 0, 30)
 reopenButton.Position = UDim2.new(0.5, -75, 0.9, 0)
@@ -125,7 +127,7 @@ local function styleButton(text, pos, color)
     return btn
 end
 
--- Side button factory (small square circular)
+-- Side button factory
 local function styleSideButton(text, pos, color)
     local btn = Instance.new("TextButton", mainFrame)
     btn.Size = UDim2.new(0, 40, 0, 40)
@@ -144,17 +146,36 @@ local function styleSideButton(text, pos, color)
     return btn
 end
 
--- Buttons
+-- Buttons and Inputs
 local tpButton = styleButton("Teleport to Strongest Pet", UDim2.new(0,20,0,40), Color3.new(1,1,1))
 local autoAnyButton = styleButton("Auto Teleport (All)", UDim2.new(0,20,0,95), theme.Danger)
-local autoButton = styleButton("Auto Teleport 3K", UDim2.new(0,20,0,150), theme.Danger)
-local loadUWButton = styleButton("Auto Load UW", UDim2.new(0,20,0,205), theme.Danger) -- New Button
+local autoCustomButton = styleButton("Auto Teleport Custom", UDim2.new(0,20,0,150), theme.Danger)
 
--- Side Buttons: positioned with extra horizontal spacing (no touching)
+-- Text box for custom strength
+local minStrengthInput = Instance.new("TextBox", mainFrame)
+minStrengthInput.Size = UDim2.new(0, 200, 0, 30)
+minStrengthInput.Position = UDim2.new(0, 20, 0, 200)
+minStrengthInput.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+minStrengthInput.TextColor3 = Color3.new(1, 1, 1)
+minStrengthInput.Font = theme.Font
+minStrengthInput.TextSize = 14
+minStrengthInput.PlaceholderText = "Minimum Strength (e.g., 3000)"
+minStrengthInput.Text = "3000" -- Default value
+minStrengthInput.ClearTextOnFocus = false
+Instance.new("UICorner", minStrengthInput).CornerRadius = UDim.new(0, 6)
+local inputStroke = Instance.new("UIStroke", minStrengthInput)
+inputStroke.Color = Color3.fromRGB(100, 100, 100)
+inputStroke.Thickness = 1
+inputStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+
+-- Auto Load UW Button
+local loadUWButton = styleButton("Auto Load UW", UDim2.new(0,20,0,240), theme.Danger)
+
+-- Side Buttons
 local sideUnderwater = styleSideButton("UW", UDim2.new(1, -60, 0, 40), theme.Accent)
 local sideMainIsland = styleSideButton("MI", UDim2.new(1, -60, 0, 95), theme.Success)
 
--- Glow system (behind buttons)
+-- Glow system
 local function createGlow(button, color)
     local glowFrame = Instance.new("Frame", button)
     glowFrame.Size = UDim2.new(1, 12, 1, 12)
@@ -176,8 +197,8 @@ end
 
 local glowTP = createGlow(tpButton, Color3.new(1,1,1))
 local glowAll = createGlow(autoAnyButton, theme.Danger)
-local glow2K = createGlow(autoButton, theme.Danger)
-local glowUW = createGlow(loadUWButton, theme.Danger) -- New Glow
+local glowCustom = createGlow(autoCustomButton, theme.Danger)
+local glowUW = createGlow(loadUWButton, theme.Danger)
 
 local function startGlow(glow)
     for _, t in ipairs(glow.tweens) do t:Cancel() end
@@ -211,12 +232,12 @@ local function findStrongestPetAny()
     return strongest
 end
 
-local function findStrongestPet3K()
-    local strongest, max = nil, 2900
+local function findStrongestPetCustom(minStrength)
+    local strongest, max = nil, minStrength - 1
     for _, obj in pairs(CollectionService:GetTagged("Roaming")) do
         local s = obj:GetAttribute("Strength")
         local o = obj:GetAttribute("OwnerId")
-        if s and s >= 2900 and (not o or o == 0) and s > max then
+        if s and s >= minStrength and (not o or o == 0) and s > max then
             max = s
             strongest = obj
         end
@@ -224,20 +245,15 @@ local function findStrongestPet3K()
     return strongest
 end
 
--- Check if player is currently throwing lasso/doing a minigame
 local function isPlayerBusy()
-    -- 1. Check if we are currently targeting/catching a pet (OwnerId == our UserId)
     for _, obj in pairs(CollectionService:GetTagged("Roaming")) do
         local o = obj:GetAttribute("OwnerId")
         if o == player.UserId then
             return true
         end
     end
-    
-    -- 2. Check PlayerGui for active Minigame/Catching UI pop-ups
     local pg = player:FindFirstChild("PlayerGui")
     if pg then
-        -- Check top-level ScreenGuis
         for _, gui in pairs(pg:GetChildren()) do
             if gui:IsA("ScreenGui") and gui.Enabled then
                 local name = string.lower(gui.Name)
@@ -246,12 +262,7 @@ local function isPlayerBusy()
                 end
             end
         end
-        
-        -- Check for specific frames inside UIs (in case it's grouped under a parent HUD)
-        local mgFrame = pg:FindFirstChild("Minigame", true) 
-                     or pg:FindFirstChild("Catching", true)
-                     or pg:FindFirstChild("Minigames", true)
-                     
+        local mgFrame = pg:FindFirstChild("Minigame", true) or pg:FindFirstChild("Catching", true) or pg:FindFirstChild("Minigames", true)
         if mgFrame and mgFrame:IsA("GuiObject") and mgFrame.Visible then
             local sGui = mgFrame:FindFirstAncestorOfClass("ScreenGui")
             if sGui and sGui.Enabled then
@@ -259,7 +270,6 @@ local function isPlayerBusy()
             end
         end
     end
-    
     return false
 end
 
@@ -293,22 +303,33 @@ autoAnyButton.MouseButton1Click:Connect(function()
     end
 end)
 
-local autoMode3K = false
-autoButton.MouseButton1Click:Connect(function()
-    autoMode3K = not autoMode3K
-    autoButton.Text = "Auto Teleport 3K: " .. (autoMode3K and "ON" or "OFF")
-    if autoMode3K then
-        startGlow(glow2K)
-        autoButton.UIStroke.Color = Color3.new(1,1,1)
-        autoButton.TextColor3 = Color3.new(1,1,1)
+-- Custom Strength Input and Logic
+local currentMinStrength = 3000
+minStrengthInput.FocusLost:Connect(function()
+    local val = tonumber(minStrengthInput.Text)
+    if val then
+        currentMinStrength = val
     else
-        stopGlow(glow2K)
-        autoButton.UIStroke.Color = theme.Danger
-        autoButton.TextColor3 = theme.Danger
+        -- Revert to last valid number if they typed text
+        minStrengthInput.Text = tostring(currentMinStrength)
     end
 end)
 
--- New button logic
+local autoModeCustom = false
+autoCustomButton.MouseButton1Click:Connect(function()
+    autoModeCustom = not autoModeCustom
+    autoCustomButton.Text = "Auto Teleport Custom: " .. (autoModeCustom and "ON" or "OFF")
+    if autoModeCustom then
+        startGlow(glowCustom)
+        autoCustomButton.UIStroke.Color = Color3.new(1,1,1)
+        autoCustomButton.TextColor3 = Color3.new(1,1,1)
+    else
+        stopGlow(glowCustom)
+        autoCustomButton.UIStroke.Color = theme.Danger
+        autoCustomButton.TextColor3 = theme.Danger
+    end
+end)
+
 local autoLoadUW = false
 loadUWButton.MouseButton1Click:Connect(function()
     autoLoadUW = not autoLoadUW
@@ -384,24 +405,19 @@ task.spawn(function()
         local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
         if not root then continue end
 
-        -- If player is catching a pet or doing a minigame, pause teleporting!
         if isPlayerBusy() then
             continue
         end
 
-        -- Auto Load UW (Separate Independent Button)
+        -- Auto Load UW 
         if autoLoadUW and not returning then
             if os.clock() - lastUnderwaterTP >= 60 then
                 lastUnderwaterTP = os.clock()
 
-                -- Save current position
                 savedPosition = root.CFrame
-
-                -- TP to underwater
                 root.CFrame = underwater
                 returning = true
 
-                -- TP back after 3 seconds
                 task.delay(3, function()
                     local r = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
                     if r and savedPosition then
@@ -412,13 +428,12 @@ task.spawn(function()
             end
         end
 
-        -- Auto 3K pet TP
-        if autoMode3K and not returning then
-            local pet = findStrongestPet3K()
+        -- Auto Custom pet TP (Uses the typed number)
+        if autoModeCustom and not returning then
+            local pet = findStrongestPetCustom(currentMinStrength)
             if pet then
                 root.CFrame = pet:GetPivot() + Vector3.new(0,5,0)
             end
-        -- Changed to elseif to prevent double checking if both are enabled
         elseif autoModeAll and not returning then
             local pet = findStrongestPetAny()
             if pet then
