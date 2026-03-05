@@ -4,6 +4,7 @@
     + paused teleporting during lasso/minigame events
     + separate Auto Load UW button (independent 60s cycle)
     + Auto Teleport Custom (Input custom minimum strength)
+    + FIXED: Reopen button no longer opens when dragged
 --]]
 
 local player = game.Players.LocalPlayer
@@ -51,7 +52,7 @@ local function makeDraggable(gui)
     end)
 end
 
--- Main Frame (Adjusted height to 340 to perfectly fit the new text box and layout)
+-- Main Frame
 local mainFrame = Instance.new("Frame", screenGui)
 mainFrame.Size = UDim2.new(0, 300, 0, 340)
 mainFrame.Position = UDim2.new(0.5, -150, 0.5, -170)
@@ -103,9 +104,30 @@ closeButton.MouseButton1Click:Connect(function()
     reopenButton.Visible = true
 end)
 
-reopenButton.MouseButton1Click:Connect(function()
-    mainFrame.Visible = true
-    reopenButton.Visible = false
+-- SMART REOPEN CLICK DETECTION (Ignores drags)
+local rStartPos, rHasDragged
+reopenButton.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        rStartPos = input.Position
+        rHasDragged = false
+    end
+end)
+reopenButton.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement and rStartPos then
+        -- If mouse moved more than 5 pixels, it's considered a drag
+        if (input.Position - rStartPos).Magnitude > 5 then
+            rHasDragged = true
+        end
+    end
+end)
+reopenButton.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        if not rHasDragged then
+            mainFrame.Visible = true
+            reopenButton.Visible = false
+        end
+        rStartPos = nil
+    end
 end)
 
 -- Button factory (main)
@@ -310,7 +332,6 @@ minStrengthInput.FocusLost:Connect(function()
     if val then
         currentMinStrength = val
     else
-        -- Revert to last valid number if they typed text
         minStrengthInput.Text = tostring(currentMinStrength)
     end
 end)
@@ -377,13 +398,13 @@ knob.BackgroundColor3 = Color3.new(1,1,1)
 Instance.new("UICorner", knob).CornerRadius = UDim.new(0,8)
 knob.AutoButtonColor = false
 
-local dragging = false
-knob.MouseButton1Down:Connect(function() dragging = true end)
+local draggingKnob = false
+knob.MouseButton1Down:Connect(function() draggingKnob = true end)
 UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then draggingKnob = false end
 end)
 UserInputService.InputChanged:Connect(function(input)
-    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+    if draggingKnob and input.UserInputType == Enum.UserInputType.MouseMovement then
         local relX = math.clamp(input.Position.X - sliderFrame.AbsolutePosition.X - 10, 0, sliderBar.AbsoluteSize.X)
         knob.Position = UDim2.new(0, relX, 0, 0)
         local speed = 30 + (relX/sliderBar.AbsoluteSize.X)*(200-30)
