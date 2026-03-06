@@ -7,6 +7,7 @@
     + FIXED: Reopen button no longer opens when dragged
     + WEATHER NOTIFIER: Bypasses Roblox Volume = 0 and sends Windows/In-Game alerts
     + UI FIX: Fixed chunky/weird text on the weather tick buttons
+    + WEATHER UPDATE: Added Rain, Thunderstorm, Snowy, and Valentines to the grid!
 --]]
 
 local player = game.Players.LocalPlayer
@@ -27,10 +28,16 @@ local theme = {
 
 -- Dictionary to store active weathers 
 local TargetWeathers = {}
-local weatherDisplayNames = {
-    ["AuroraBorealis"] = "Aurora",["CosmicShower"] = "Cosmic Shower",
-    ["Eruption"] = "Volcano",["Underwater"] = "Underwater",
-    ["Gravebound"] = "Gravebound",["Blizzard"] = "Blizzard",
+local weatherDisplayNames = {["Rain"] = "Rain",
+    ["Thunderstorm"] = "Thunderstorm",
+    ["Snowy"] = "Snowy",
+    ["Valentines"] = "Valentines",
+    ["AuroraBorealis"] = "Aurora",
+    ["CosmicShower"] = "Cosmic Shower",
+    ["Eruption"] = "Volcano",
+    ["Underwater"] = "Underwater",
+    ["Gravebound"] = "Gravebound",
+    ["Blizzard"] = "Blizzard",
     ["Sandstorm"] = "Sandstorm"
 }
 -- Initialize all to true by default
@@ -64,7 +71,7 @@ local function sendOSNotification(title, text)
             sound.Volume = 3
             sound:Play()
             
-            task.delay(1, function()
+            task.delay(2.5, function()
                 if originalVolume == 0 then
                     gameSettings.MasterVolume = 0 
                 end
@@ -112,10 +119,10 @@ local function makeDraggable(gui)
     end)
 end
 
--- Main Frame
+-- Main Frame (Height increased to 580 to fit all weather buttons)
 local mainFrame = Instance.new("Frame", screenGui)
-mainFrame.Size = UDim2.new(0, 300, 0, 510)
-mainFrame.Position = UDim2.new(0.5, -150, 0.5, -255)
+mainFrame.Size = UDim2.new(0, 300, 0, 580)
+mainFrame.Position = UDim2.new(0.5, -150, 0.5, -290)
 mainFrame.BackgroundColor3 = theme.Background
 mainFrame.BorderSizePixel = 0
 mainFrame.Active = true
@@ -246,10 +253,10 @@ local loadUWButton = styleButton("Auto Load UW", UDim2.new(0,20,0,245), theme.Da
 local weatherButton = styleButton("Rare Weather Notifier: OFF", UDim2.new(0,20,0,300), theme.Danger)
 
 ---------------------------------------------------------------------
--- WEATHER TICK BUTTONS (GRID) - FIXED TEXT RENDERING
+-- WEATHER TICK BUTTONS (GRID)
 ---------------------------------------------------------------------
 local weatherTickFrame = Instance.new("Frame", mainFrame)
-weatherTickFrame.Size = UDim2.new(0, 260, 0, 100)
+weatherTickFrame.Size = UDim2.new(0, 260, 0, 160) -- Increased to fit more options
 weatherTickFrame.Position = UDim2.new(0, 20, 0, 350)
 weatherTickFrame.BackgroundTransparency = 1
 
@@ -265,14 +272,14 @@ for weatherId, displayName in pairs(weatherDisplayNames) do
     tickBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
     tickBtn.TextColor3 = theme.Success
     tickBtn.Font = theme.Font
-    tickBtn.TextSize = 14 -- Bumped size slightly so it's easier to read
+    tickBtn.TextSize = 14 
     tickBtn.AutoButtonColor = false
     Instance.new("UICorner", tickBtn).CornerRadius = UDim.new(0, 4)
     
     local strk = Instance.new("UIStroke", tickBtn)
     strk.Color = theme.Success
     strk.Thickness = 1
-    strk.ApplyStrokeMode = Enum.ApplyStrokeMode.Border -- FIX: Applies outline to the button edge only, not the text
+    strk.ApplyStrokeMode = Enum.ApplyStrokeMode.Border 
     
     tickBtn.MouseButton1Click:Connect(function()
         TargetWeathers[weatherId] = not TargetWeathers[weatherId]
@@ -540,6 +547,7 @@ task.spawn(function()
 
                 if current and current ~= lastWeather then
                     lastWeather = current
+                    -- Check if the specific weather is Ticked ON
                     if TargetWeathers[current] then
                         local prettyName = weatherDisplayNames[current] or current
                         sendOSNotification("Pet Catchers - Rare Weather!", prettyName .. " has started in the game!")
