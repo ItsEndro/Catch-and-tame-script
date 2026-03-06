@@ -5,6 +5,8 @@
     + separate Auto Load UW button (independent 60s cycle)
     + Auto Teleport Custom (Input custom minimum strength)
     + FIXED: Reopen button no longer opens when dragged
+    + WEATHER NOTIFIER: Bypasses Roblox Volume = 0 and sends Windows/In-Game alerts
+    + UI FIX: Fixed chunky/weird text on the weather tick buttons
 --]]
 
 local player = game.Players.LocalPlayer
@@ -12,6 +14,7 @@ local CollectionService = game:GetService("CollectionService")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local StarterGui = game:GetService("StarterGui")
 
 local theme = {
     Background = Color3.fromRGB(30, 30, 30),
@@ -22,12 +25,69 @@ local theme = {
     Font = Enum.Font.SourceSansBold
 }
 
+-- Dictionary to store active weathers 
+local TargetWeathers = {}
+local weatherDisplayNames = {
+    ["AuroraBorealis"] = "Aurora",["CosmicShower"] = "Cosmic Shower",
+    ["Eruption"] = "Volcano",["Underwater"] = "Underwater",
+    ["Gravebound"] = "Gravebound",["Blizzard"] = "Blizzard",
+    ["Sandstorm"] = "Sandstorm"
+}
+-- Initialize all to true by default
+for weatherId, _ in pairs(weatherDisplayNames) do
+    TargetWeathers[weatherId] = true
+end
+
+---------------------------------------------------------------------
+-- ROBUST NOTIFICATION HANDLER (OS Sound Bypass)
+---------------------------------------------------------------------
+local function sendOSNotification(title, text)
+    -- 1. ULTIMATE BYPASS: Windows Native MessageBox
+    if type(messagebox) == "function" then
+        task.spawn(function()
+            pcall(function() messagebox(text, title, 64) end)
+        end)
+    end
+
+    -- 2. VOLUME HIJACK: Force Roblox volume up temporarily if muted
+    task.spawn(function()
+        pcall(function()
+            local gameSettings = UserSettings():GetService("UserGameSettings")
+            local originalVolume = gameSettings.MasterVolume
+            
+            if originalVolume == 0 then
+                gameSettings.MasterVolume = 0.5 
+            end
+            
+            local sound = Instance.new("Sound", workspace)
+            sound.SoundId = "rbxassetid://4590657391" -- Clean ping sound
+            sound.Volume = 3
+            sound:Play()
+            
+            task.delay(1, function()
+                if originalVolume == 0 then
+                    gameSettings.MasterVolume = 0 
+                end
+                sound:Destroy()
+            end)
+        end)
+    end)
+
+    -- 3. Visual In-Game Notification
+    pcall(function()
+        StarterGui:SetCore("SendNotification", {
+            Title = title,
+            Text = text,
+            Duration = 10,
+        })
+    end)
+end
+
 local guiParent = (gethui and gethui()) or game:GetService("CoreGui")
 local screenGui = Instance.new("ScreenGui", guiParent)
 screenGui.Name = "TeleportGUI_Sirius"
 screenGui.ResetOnSpawn = false
 
--- stable drag logic
 local function makeDraggable(gui)
     local dragging, dragInput, dragStart, startPos
     gui.InputBegan:Connect(function(input)
@@ -54,15 +114,14 @@ end
 
 -- Main Frame
 local mainFrame = Instance.new("Frame", screenGui)
-mainFrame.Size = UDim2.new(0, 300, 0, 340)
-mainFrame.Position = UDim2.new(0.5, -150, 0.5, -170)
+mainFrame.Size = UDim2.new(0, 300, 0, 510)
+mainFrame.Position = UDim2.new(0.5, -150, 0.5, -255)
 mainFrame.BackgroundColor3 = theme.Background
 mainFrame.BorderSizePixel = 0
 mainFrame.Active = true
 makeDraggable(mainFrame)
 Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 12)
 
--- Title
 local title = Instance.new("TextLabel", mainFrame)
 title.Size = UDim2.new(1, 0, 0, 30)
 title.Text = "Teleport GUI Custom"
@@ -72,7 +131,6 @@ title.Font = theme.Font
 title.TextSize = 18
 Instance.new("UICorner", title).CornerRadius = UDim.new(0, 12)
 
--- Close button
 local closeButton = Instance.new("TextButton", title)
 closeButton.Size = UDim2.new(0, 30, 1, 0)
 closeButton.Position = UDim2.new(1, -30, 0, 0)
@@ -81,7 +139,6 @@ closeButton.BackgroundTransparency = 1
 closeButton.TextColor3 = theme.Danger
 closeButton.TextSize = 18
 
--- Reopen Button
 local reopenButton = Instance.new("TextButton", screenGui)
 reopenButton.Size = UDim2.new(0, 150, 0, 30)
 reopenButton.Position = UDim2.new(0.5, -75, 0.9, 0)
@@ -104,7 +161,6 @@ closeButton.MouseButton1Click:Connect(function()
     reopenButton.Visible = true
 end)
 
--- SMART REOPEN CLICK DETECTION (Ignores drags)
 local rStartPos, rHasDragged
 reopenButton.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -114,7 +170,6 @@ reopenButton.InputBegan:Connect(function(input)
 end)
 reopenButton.InputChanged:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseMovement and rStartPos then
-        -- If mouse moved more than 5 pixels, it's considered a drag
         if (input.Position - rStartPos).Magnitude > 5 then
             rHasDragged = true
         end
@@ -130,7 +185,6 @@ reopenButton.InputEnded:Connect(function(input)
     end
 end)
 
--- Button factory (main)
 local function styleButton(text, pos, color)
     local btn = Instance.new("TextButton", mainFrame)
     btn.Size = UDim2.new(0, 200, 0, 40)
@@ -149,7 +203,6 @@ local function styleButton(text, pos, color)
     return btn
 end
 
--- Side button factory
 local function styleSideButton(text, pos, color)
     local btn = Instance.new("TextButton", mainFrame)
     btn.Size = UDim2.new(0, 40, 0, 40)
@@ -168,12 +221,10 @@ local function styleSideButton(text, pos, color)
     return btn
 end
 
--- Buttons and Inputs
 local tpButton = styleButton("Teleport to Strongest Pet", UDim2.new(0,20,0,40), Color3.new(1,1,1))
 local autoAnyButton = styleButton("Auto Teleport (All)", UDim2.new(0,20,0,95), theme.Danger)
 local autoCustomButton = styleButton("Auto Teleport Custom", UDim2.new(0,20,0,150), theme.Danger)
 
--- Text box for custom strength
 local minStrengthInput = Instance.new("TextBox", mainFrame)
 minStrengthInput.Size = UDim2.new(0, 200, 0, 30)
 minStrengthInput.Position = UDim2.new(0, 20, 0, 200)
@@ -182,7 +233,7 @@ minStrengthInput.TextColor3 = Color3.new(1, 1, 1)
 minStrengthInput.Font = theme.Font
 minStrengthInput.TextSize = 14
 minStrengthInput.PlaceholderText = "Minimum Strength (e.g., 3000)"
-minStrengthInput.Text = "3000" -- Default value
+minStrengthInput.Text = "3000"
 minStrengthInput.ClearTextOnFocus = false
 Instance.new("UICorner", minStrengthInput).CornerRadius = UDim.new(0, 6)
 local inputStroke = Instance.new("UIStroke", minStrengthInput)
@@ -190,14 +241,56 @@ inputStroke.Color = Color3.fromRGB(100, 100, 100)
 inputStroke.Thickness = 1
 inputStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
--- Auto Load UW Button
-local loadUWButton = styleButton("Auto Load UW", UDim2.new(0,20,0,240), theme.Danger)
+local loadUWButton = styleButton("Auto Load UW", UDim2.new(0,20,0,245), theme.Danger)
 
--- Side Buttons
+local weatherButton = styleButton("Rare Weather Notifier: OFF", UDim2.new(0,20,0,300), theme.Danger)
+
+---------------------------------------------------------------------
+-- WEATHER TICK BUTTONS (GRID) - FIXED TEXT RENDERING
+---------------------------------------------------------------------
+local weatherTickFrame = Instance.new("Frame", mainFrame)
+weatherTickFrame.Size = UDim2.new(0, 260, 0, 100)
+weatherTickFrame.Position = UDim2.new(0, 20, 0, 350)
+weatherTickFrame.BackgroundTransparency = 1
+
+local gridLayout = Instance.new("UIGridLayout", weatherTickFrame)
+gridLayout.CellSize = UDim2.new(0, 125, 0, 22)
+gridLayout.CellPadding = UDim2.new(0, 10, 0, 4)
+gridLayout.SortOrder = Enum.SortOrder.Name
+
+for weatherId, displayName in pairs(weatherDisplayNames) do
+    local tickBtn = Instance.new("TextButton", weatherTickFrame)
+    tickBtn.Name = displayName 
+    tickBtn.Text = "✅ " .. displayName
+    tickBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+    tickBtn.TextColor3 = theme.Success
+    tickBtn.Font = theme.Font
+    tickBtn.TextSize = 14 -- Bumped size slightly so it's easier to read
+    tickBtn.AutoButtonColor = false
+    Instance.new("UICorner", tickBtn).CornerRadius = UDim.new(0, 4)
+    
+    local strk = Instance.new("UIStroke", tickBtn)
+    strk.Color = theme.Success
+    strk.Thickness = 1
+    strk.ApplyStrokeMode = Enum.ApplyStrokeMode.Border -- FIX: Applies outline to the button edge only, not the text
+    
+    tickBtn.MouseButton1Click:Connect(function()
+        TargetWeathers[weatherId] = not TargetWeathers[weatherId]
+        if TargetWeathers[weatherId] then
+            tickBtn.Text = "✅ " .. displayName
+            tickBtn.TextColor3 = theme.Success
+            strk.Color = theme.Success
+        else
+            tickBtn.Text = "❌ " .. displayName
+            tickBtn.TextColor3 = theme.Danger
+            strk.Color = theme.Danger
+        end
+    end)
+end
+
 local sideUnderwater = styleSideButton("UW", UDim2.new(1, -60, 0, 40), theme.Accent)
 local sideMainIsland = styleSideButton("MI", UDim2.new(1, -60, 0, 95), theme.Success)
 
--- Glow system
 local function createGlow(button, color)
     local glowFrame = Instance.new("Frame", button)
     glowFrame.Size = UDim2.new(1, 12, 1, 12)
@@ -221,6 +314,7 @@ local glowTP = createGlow(tpButton, Color3.new(1,1,1))
 local glowAll = createGlow(autoAnyButton, theme.Danger)
 local glowCustom = createGlow(autoCustomButton, theme.Danger)
 local glowUW = createGlow(loadUWButton, theme.Danger)
+local glowWeather = createGlow(weatherButton, theme.Accent)
 
 local function startGlow(glow)
     for _, t in ipairs(glow.tweens) do t:Cancel() end
@@ -240,7 +334,6 @@ local function stopGlow(glow)
     glow.grad.Rotation = 0
 end
 
--- Pet finders
 local function findStrongestPetAny()
     local strongest, max = nil, 0
     for _, obj in pairs(CollectionService:GetTagged("Roaming")) do
@@ -295,11 +388,9 @@ local function isPlayerBusy()
     return false
 end
 
--- ISLAND POSITIONS
 local underwater = CFrame.new(13.0744, 180.5068, -4959.8169)
 local mainIsland = CFrame.new(-105.803, 830.677, -2745.03)
 
--- Teleport buttons handlers
 tpButton.MouseButton1Click:Connect(function()
     local pet = findStrongestPetAny()
     local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
@@ -325,7 +416,6 @@ autoAnyButton.MouseButton1Click:Connect(function()
     end
 end)
 
--- Custom Strength Input and Logic
 local currentMinStrength = 3000
 minStrengthInput.FocusLost:Connect(function()
     local val = tonumber(minStrengthInput.Text)
@@ -366,7 +456,22 @@ loadUWButton.MouseButton1Click:Connect(function()
     end
 end)
 
--- Side buttons
+local weatherNotifEnabled = false
+weatherButton.MouseButton1Click:Connect(function()
+    weatherNotifEnabled = not weatherNotifEnabled
+    weatherButton.Text = "Rare Weather Notifier: " .. (weatherNotifEnabled and "ON" or "OFF")
+    if weatherNotifEnabled then
+        startGlow(glowWeather)
+        weatherButton.UIStroke.Color = theme.Accent
+        weatherButton.TextColor3 = theme.Accent
+        sendOSNotification("Weather Notifier", "Notifier ON! Ensure you select the weathers below.")
+    else
+        stopGlow(glowWeather)
+        weatherButton.UIStroke.Color = theme.Danger
+        weatherButton.TextColor3 = theme.Danger
+    end
+end)
+
 sideUnderwater.MouseButton1Click:Connect(function()
     local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
     if root then root.CFrame = underwater end
@@ -377,10 +482,10 @@ sideMainIsland.MouseButton1Click:Connect(function()
     if root then root.CFrame = mainIsland end
 end)
 
--- WalkSpeed slider at bottom
+-- WalkSpeed slider at bottom (Anchored to the bottom safely)
 local sliderFrame = Instance.new("Frame", mainFrame)
 sliderFrame.Size = UDim2.new(0, 260, 0, 30)
-sliderFrame.Position = UDim2.new(0, 20, 1, -40)
+sliderFrame.Position = UDim2.new(0, 20, 1, -45)
 sliderFrame.BackgroundColor3 = Color3.fromRGB(50,50,50)
 Instance.new("UICorner", sliderFrame).CornerRadius = UDim.new(0,8)
 
@@ -414,14 +519,34 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
--- Main loop (auto teleport + island switching)
 task.spawn(function()
     local lastUnderwaterTP = 0
     local savedPosition = nil
     local returning = false
+    local lastWeather = nil
 
     while true do
         task.wait(0.5)
+
+        -- WEATHER NOTIFICATION LOGIC
+        if weatherNotifEnabled then
+            pcall(function()
+                local Knit = require(ReplicatedStorage.Packages.knit)
+                local WeatherCtrl = Knit.GetController("WeatherController")
+                local current = nil
+                
+                if WeatherCtrl then current = WeatherCtrl.CurrentWeather end
+                if not current then current = workspace:GetAttribute("Weather") end
+
+                if current and current ~= lastWeather then
+                    lastWeather = current
+                    if TargetWeathers[current] then
+                        local prettyName = weatherDisplayNames[current] or current
+                        sendOSNotification("Pet Catchers - Rare Weather!", prettyName .. " has started in the game!")
+                    end
+                end
+            end)
+        end
 
         local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
         if not root then continue end
@@ -430,11 +555,9 @@ task.spawn(function()
             continue
         end
 
-        -- Auto Load UW 
         if autoLoadUW and not returning then
             if os.clock() - lastUnderwaterTP >= 60 then
                 lastUnderwaterTP = os.clock()
-
                 savedPosition = root.CFrame
                 root.CFrame = underwater
                 returning = true
@@ -449,7 +572,6 @@ task.spawn(function()
             end
         end
 
-        -- Auto Custom pet TP (Uses the typed number)
         if autoModeCustom and not returning then
             local pet = findStrongestPetCustom(currentMinStrength)
             if pet then
